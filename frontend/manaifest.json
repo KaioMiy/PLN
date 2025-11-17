@@ -1,0 +1,9 @@
+{
+  "name": "Agro Voice IA",
+  "short_name": "AgroIA",
+  "start_url": "login.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4caf50",
+  "icons": []
+}
