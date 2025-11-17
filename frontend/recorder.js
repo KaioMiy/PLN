@@ -5,8 +5,6 @@ const startBtn = document.getElementById("startBtn");
 const stopBtn = document.getElementById("stopBtn");
 const player = document.getElementById("player");
 
-const API_BASE = "https://pln.onrender.com";
-
 
 startBtn.onclick = async () => {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -48,3 +46,4 @@ stopBtn.onclick = () => {
         stopBtn.disabled = true;
     };
 };
+
