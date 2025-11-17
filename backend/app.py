@@ -9,8 +9,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
 
+# 🚀 CORS TOTALMENTE LIBERADO (funciona no Render)
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+
+# Cliente OpenAI
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Usuários cadastrados (autenticação simulada)
@@ -20,9 +23,13 @@ USERS = {
     "demo": "demo"
 }
 
-# Tokens ativos
+# Tokens armazenados em memória
 TOKENS = {}
 
+
+# -------------------------------
+# 🔐 LOGIN
+# -------------------------------
 @app.post("/login")
 def login():
     data = request.json
@@ -42,33 +49,37 @@ def login():
     return jsonify({"error": "Credenciais inválidas"}), 401
 
 
+# -------------------------------
+# 🎤 ÁUDIO → TRANSCRIÇÃO → IA → ÁUDIO
+# -------------------------------
 @app.post("/api/audio")
 def process_audio():
-    # 🔐 Verifica token
+    # Validar token
     token = request.headers.get("Authorization")
+
     if not token or token not in TOKENS:
         return jsonify({"error": "Não autorizado"}), 403
 
+    # Receber arquivo
     file = request.files.get("file")
 
     if not file:
         return jsonify({"error": "Nenhum arquivo enviado"}), 400
 
-    # ✔️ Formato correto exigido pelo SDK da OpenAI
+    # Formato EXIGIDO pelo novo SDK da OpenAI
     openai_file = (file.filename, file.stream, file.mimetype)
 
-    # 🎤 1. Transcrição do áudio
+    # 1️⃣ TRANSCRIÇÃO
     try:
         transcription = client.audio.transcriptions.create(
             model="gpt-4o-mini-transcribe",
             file=openai_file
         )
+        text = transcription.text
     except Exception as e:
-        return jsonify({"error": f"Erro ao transcrever: {str(e)}"}), 500
+        return jsonify({"error": f"Erro ao transcrever áudio: {str(e)}"}), 500
 
-    text = transcription.text
-
-    # 🤖 2. IA gera resposta em texto
+    # 2️⃣ RESPOSTA DA IA
     try:
         completion = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -78,24 +89,21 @@ def process_audio():
             ]
         )
         ai_text = completion.choices[0].message.content
-
     except Exception as e:
         return jsonify({"error": f"Erro na IA: {str(e)}"}), 500
 
-    # 🔊 3. Converter texto da IA para áudio (TTS)
+    # 3️⃣ CONVERTER TEXTO PARA ÁUDIO (TTS)
     try:
         speech = client.audio.speech.create(
             model="gpt-4o-mini-tts",
             voice="alloy",
             input=ai_text
         )
-
         audio_base64 = base64.b64encode(speech.read()).decode("utf-8")
-
     except Exception as e:
         return jsonify({"error": f"Erro ao gerar áudio: {str(e)}"}), 500
 
-    # 📦 4. Retornar tudo
+    # 4️⃣ RETORNAR RESULTADO FINAL
     return jsonify({
         "transcription": text,
         "ai_text": ai_text,
@@ -103,5 +111,8 @@ def process_audio():
     })
 
 
+# -------------------------------
+# SERVER LOCAL (para testes)
+# -------------------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
